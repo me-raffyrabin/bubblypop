@@ -2,9 +2,26 @@
 
 > Pop watery floating bubbles, uncover hidden golden-ratio spheres, and beat the clock.
 
+![game](https://img.shields.io/badge/game-bubble--pop-6cd4ff)
+![javascript](https://img.shields.io/badge/vanilla-JS-f7df1e)
+![three.js](https://img.shields.io/badge/three.js-r160-000000)
+![web audio api](https://img.shields.io/badge/Web%20Audio%20API-soft%20pops-ff7eb6)
+![no build](https://img.shields.io/badge/build-zero%20steps-22c55e)
+![license](https://img.shields.io/badge/license-MIT-blue)
+
 **BubblyPop** is a playful, mobile-friendly browser game built with **zero build steps** — just open the HTML and play. Twenty-five fluid, watery bubbles drift up your screen. Five of them secretly hide a glowing, color-coded 3D **golden-lattice sphere**. Find all five before the 60-second timer runs out and you win!
 
 Everything runs in a single self-contained file: synthesized pop sounds (Web Audio API), watery SVG textures, and animated 3D spheres (Three.js) — no assets to download.
+
+---
+
+## 🌐 Live Demo
+
+▶️ **[Play BubblyPop now!](https://me-raffyrabin.github.io/bubblypop/)**
+
+> Hosted on GitHub Pages — works right in your browser, no install needed. Best on a device with sound on. 🔊
+>
+> _Not live yet?_ Push the repo to GitHub, then go to **Settings → Pages**, set the source to your `main` branch (root), and your demo will appear at the link above.
 
 ---
 
@@ -86,6 +103,19 @@ BubblyPop/
 - **SVG `feTurbulence` / `feDisplacementMap`** — the watery fluid texture inside each bubble.
 - **[Three.js](https://threejs.org/) 0.160** (via CDN import map) — the animated golden-lattice spheres.
 - **CSS animations & the Web Animations API** — bubble drift, bursts, splash, and the winner message.
+
+---
+
+## 🏷️ Topics
+
+`game` · `bubble-pop` · `javascript` · `html5` · `threejs` · `web-audio-api` · `canvas` · `casual-game` · `vanilla-js` · `browser-game`
+
+> Add these as your repo's GitHub **Topics** (the ⚙️ next to "About" on the repo page), or apply them all at once with the GitHub CLI:
+>
+> ```bash
+> gh repo edit extremeprogrammer/BubblyPop \
+>   --add-topic game,bubble-pop,javascript,html5,threejs,web-audio-api,canvas,casual-game,vanilla-js,browser-game
+> ```
 
 ---
 

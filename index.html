@@ -2,8 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Floating Bubbles</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+<title>BubblyPop</title>
+
+<!-- PWA / standalone "native app" support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="BubblyPop">
+<meta name="theme-color" content="#04111f">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
 <style>
   :root {
     --bg-1: #04111f;
@@ -46,13 +55,60 @@
 
   .hud {
     position: fixed;
-    bottom: 18px; left: 0; right: 0;
+    bottom: calc(18px + env(safe-area-inset-bottom)); left: 0; right: 0;
     text-align: center;
     color: rgba(210,240,255,0.65);
     letter-spacing: 0.18em;
     text-transform: uppercase;
     pointer-events: none;
     z-index: 50;
+  }
+
+  /* ---- Add to Home Screen button (browser only) ---- */
+  .a2hs {
+    position: fixed; z-index: 60;
+    top: calc(12px + env(safe-area-inset-top));
+    left: 50%; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border-radius: 999px; cursor: pointer;
+    font: 600 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    letter-spacing: 0.04em; color: #06304f;
+    background: linear-gradient(180deg, #cdf3ff, #8fd9ff 60%, #6cc6ff);
+    border: 1px solid rgba(255,255,255,0.6);
+    box-shadow: 0 6px 22px rgba(0,40,80,0.45), inset 0 1px 0 rgba(255,255,255,0.7);
+    -webkit-tap-highlight-color: transparent;
+    animation: a2hsIn .5s cubic-bezier(.2,1.4,.4,1) both;
+  }
+  .a2hs:active { transform: translateX(-50%) scale(0.95); }
+  .a2hs[hidden] { display: none; }
+  @keyframes a2hsIn { from { opacity: 0; transform: translate(-50%, -14px); } }
+
+  /* iOS instructions popover */
+  .a2hs-help {
+    position: fixed; z-index: 61; inset: 0;
+    display: flex; align-items: center; justify-content: center; padding: 8vw;
+    background: rgba(2,10,20,0.55); backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  .a2hs-help[hidden] { display: none; }
+  .a2hs-help .card {
+    max-width: 320px; width: 100%; text-align: center;
+    background: linear-gradient(180deg, #0c2236, #081a2c);
+    border: 1px solid rgba(140,220,255,0.25); border-radius: 18px;
+    padding: 22px 20px; color: #dbeeff;
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  }
+  .a2hs-help h3 { margin: 0 0 12px; font-size: 17px; color: #aee9ff; }
+  .a2hs-help p { margin: 8px 0; }
+  .a2hs-help .ios-share {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; vertical-align: -5px; color: #5ac8ff;
+  }
+  .a2hs-help .close {
+    margin-top: 16px; cursor: pointer; pointer-events: auto;
+    background: rgba(120,210,255,0.15); border: 1px solid rgba(140,220,255,0.35);
+    color: #cdeeff; border-radius: 999px; padding: 9px 22px; font: inherit; font-weight: 700;
   }
   .hud b { color: rgba(170,235,255,0.95); font-weight: 600; }
   .hud .title {
@@ -337,7 +393,7 @@
   /* ---- mobile / responsive ---- */
   body { touch-action: manipulation; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
   @media (max-width: 600px) {
-    .hud { bottom: 12px; font-size: 11px; padding: 0 12px; }
+    .hud { bottom: calc(12px + env(safe-area-inset-bottom)); font-size: 11px; padding: 0 12px; }
     .hud .reset { margin-top: 6px; padding: 8px 16px; font-size: 12px; }
   }
   /* ---- touch-device "lite" mode: far fewer composited/animated layers so
@@ -368,9 +424,25 @@
 <div id="stage"></div>
 <canvas id="fx"></canvas>
 <div class="hud">
-  <div class="title">POP THE BUBBLES FOR JAEDAN</div>
+  <div class="title">POP THE BUBBLES</div>
   <div class="timer" id="timer">1:00</div>
   <div class="reset" id="reset">New Game</div>
+</div>
+
+<!-- Shown only in a browser; hidden when launched from the Home screen -->
+<button id="a2hs" class="a2hs" hidden>📲 Add to Home</button>
+
+<!-- iOS instructions (no install API on iOS, so we guide the user) -->
+<div id="a2hsHelp" class="a2hs-help" hidden>
+  <div class="card">
+    <h3>📲 Add BubblyPop to your Home Screen</h3>
+    <p>Tap the <span class="ios-share">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m8 8 4-4 4 4"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/></svg>
+    </span> <b>Share</b> button in Safari's toolbar.</p>
+    <p>Then choose <b>“Add to Home Screen”</b> ➕ and tap <b>Add</b>.</p>
+    <p>Now open BubblyPop from your Home Screen for the full-screen, app-like experience! 🫧</p>
+    <button class="close" id="a2hsClose">Got it!</button>
+  </div>
 </div>
 
 <script>
@@ -766,7 +838,7 @@ function endScreen(text, withButton) {
   }
   document.body.appendChild(w);
 }
-function showWinner()  { endScreen('JAEDAN IS THE WINNER!', false); }
+function showWinner()  { endScreen('YOU ARE THE WINNER!', false); }
 function showTimesUp() { endScreen("TIME'S UP!", true); }
 
 function clearWinUI() {
@@ -781,6 +853,49 @@ document.getElementById('reset').addEventListener('click', (e) => {
   initAudio();
   build();
 });
+
+// ---- "Add to Home" button: shown in a browser, hidden when run from Home ----
+(function setupAddToHome() {
+  const btn = document.getElementById('a2hs');
+  const help = document.getElementById('a2hsHelp');
+  // standalone = already launched from the Home screen (iOS or PWA)
+  const isStandalone = matchMedia('(display-mode: standalone)').matches
+                    || navigator.standalone === true;
+  if (isStandalone) return;                 // native-like launch → never show the button
+
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+             || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  let deferredPrompt = null;
+  // Android / desktop Chrome: capture the install prompt for one-tap install
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.hidden = false;
+  });
+
+  // Show the button in browsers (iOS has no prompt event, so show it directly)
+  if (isIOS || !('onbeforeinstallprompt' in window)) btn.hidden = false;
+
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (deferredPrompt) {                    // Android/Chrome native install
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome === 'accepted') btn.hidden = true;
+    } else {                                 // iOS: show Share → Add instructions
+      help.hidden = false;
+    }
+  });
+
+  document.getElementById('a2hsClose').addEventListener('click', (e) => {
+    e.stopPropagation(); help.hidden = true;
+  });
+  help.addEventListener('click', (e) => { if (e.target === help) help.hidden = true; });
+
+  window.addEventListener('appinstalled', () => { btn.hidden = true; help.hidden = true; });
+})();
 
 build();
 tick();

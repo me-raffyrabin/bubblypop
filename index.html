@@ -340,8 +340,26 @@
     .hud { bottom: 12px; font-size: 11px; padding: 0 12px; }
     .hud .reset { margin-top: 6px; padding: 8px 16px; font-size: 12px; }
   }
+  /* ---- touch-device "lite" mode: far fewer composited/animated layers so
+         phones (esp. iOS Safari) stay smooth ---- */
   @media (hover: none) {
-    .bubble:hover .skin { transform: none; }   /* no sticky hover scale on touch */
+    .bubble:hover .skin { transform: none; }     /* no sticky hover scale on touch */
+    .bubble .skin { animation: none; }           /* drop the per-bubble wobble */
+    .bubble .fluid {
+      mix-blend-mode: normal;                    /* blend-mode is a big iOS cost */
+      opacity: 0.5;
+    }
+    .bubble .fluid::after { display: none; }      /* drop the 2nd animated layer */
+    .bubble .skin::before {
+      box-shadow:
+        inset -4px -6px 14px rgba(10,40,80,0.5),
+        inset 4px 5px 12px rgba(180,245,255,0.3);  /* lighter, no large drop shadow */
+    }
+    body::before {                                /* calm, static background glow */
+      animation: none;
+      filter: blur(16px);
+      opacity: 0.55;
+    }
   }
 </style>
 </head>
@@ -446,7 +464,9 @@ function playPop(scale = 1) {
    ============================================================ */
 const stage = document.getElementById('stage');
 const timerEl = document.getElementById('timer');
-const COUNT = 25;
+const MOBILE = matchMedia('(hover: none)').matches;   // fewer bubbles on phones
+const COUNT = MOBILE ? 16 : 25;
+const TOPUP = MOBILE ? 12 : 20;
 const SPHERES = 5;
 
 // 5 distinct sphere colors — each special bubble gets one (hint glow + 3D sphere).
@@ -631,7 +651,7 @@ function build() {
 // re-distribute all 5 spheres (hidden again) across every on-screen bubble.
 function topUp() {
   if (over()) return;
-  for (let i = 0; i < 20; i++) { bubbles.push(makeBubble()); remaining++; }
+  for (let i = 0; i < TOPUP; i++) { bubbles.push(makeBubble()); remaining++; }
 
   // hide opened (pinned) spheres and reset progress
   if (window.clearSpheres) window.clearSpheres();
@@ -783,9 +803,10 @@ import * as THREE from 'three';
 const PHI = (1 + Math.sqrt(5)) / 2;          // golden ratio
 const GA  = Math.PI * (3 - Math.sqrt(5));    // golden angle ≈ 137.5°
 
+const TOUCH = matchMedia('(hover: none)').matches;   // phones/tablets → lighter settings
 const fxCanvas = document.getElementById('fx');
-const renderer = new THREE.WebGLRenderer({ canvas: fxCanvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const renderer = new THREE.WebGLRenderer({ canvas: fxCanvas, antialias: !TOUCH, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, TOUCH ? 1.5 : 2));
 renderer.setClearColor(0x000000, 0);
 renderer.setSize(innerWidth, innerHeight);
 
@@ -904,7 +925,7 @@ let winMode = false;
 window.spawnPinnedSphere = function (x, y, bubbleSize, colorId = 0) {
   const radius = Math.max(46, (bubbleSize || 90) * 0.7);
   const hue = SPHERE_HUES[colorId % SPHERE_HUES.length];
-  const s = makeLatticeSphere(radius, 520, hue);
+  const s = makeLatticeSphere(radius, TOUCH ? 300 : 520, hue);
   s.group.position.set(x, y, 0);
   s.home = new THREE.Vector3(x, y, 0);    // where it was pinned
   s.orbitIndex = spheres.length;          // 0..4, for equal spacing on win
@@ -915,6 +936,7 @@ window.spawnPinnedSphere = function (x, y, bubbleSize, colorId = 0) {
 // all 5 found: spheres lift off and float, equally spaced, around screen center
 window.startWinOrbit = function () { winMode = true; };
 
+let pendingClear = false;             // render one empty frame after spheres go away
 window.clearSpheres = function () {
   winMode = false;
   for (const s of spheres) {
@@ -925,12 +947,19 @@ window.clearSpheres = function () {
     });
   }
   spheres.length = 0;
+  pendingClear = true;
 };
 
 const easeOutBack = t => { const c = 1.7; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
 
 function render() {
   requestAnimationFrame(render);
+
+  // Performance: most of the time there are no spheres on screen, so skip all
+  // WebGL work entirely — no per-frame full-screen canvas redraw/composite.
+  const active = spheres.length > 0 || winMode;
+  if (!active && !pendingClear) return;
+
   const t = clock.getElapsedTime();
 
   // win: equally-spaced orbit ring around screen center
@@ -967,6 +996,7 @@ function render() {
   }
 
   renderer.render(scene, camera);
+  pendingClear = false;          // leftover frame (if any) has now been cleared
 }
 render();
 

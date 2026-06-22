@@ -58,7 +58,7 @@ No build, no dependencies to install. Either:
 **Option A — just open it**
 ```bash
 # clone, then open in a browser
-git clone https://github.com/extremeprogrammer/BubblyPop.git
+git clone https://github.com/me-raffyrabin/bubblypop.git
 cd BubblyPop
 open index.html        # macOS  (use 'xdg-open' on Linux, or double-click on Windows)
 ```
@@ -79,7 +79,7 @@ python3 -m http.server 8000
 
 It's a static site — host it anywhere:
 
-- **GitHub Pages**: push to GitHub, then enable Pages on the `main` branch (root). Your game is live at `https://extremeprogrammer.github.io/BubblyPop/`.
+- **GitHub Pages**: push to GitHub, then enable Pages on the `main` branch (root). Your game is live at `https://me-raffyrabin.github.io/bubblypop/`.
 - Or drop the folder onto Netlify, Vercel, Cloudflare Pages, etc.
 
 ---
@@ -113,7 +113,7 @@ BubblyPop/
 > Add these as your repo's GitHub **Topics** (the ⚙️ next to "About" on the repo page), or apply them all at once with the GitHub CLI:
 >
 > ```bash
-> gh repo edit extremeprogrammer/BubblyPop \
+> gh repo edit me-raffyrabin/bubblypop \
 >   --add-topic game,bubble-pop,javascript,html5,threejs,web-audio-api,canvas,casual-game,vanilla-js,browser-game
 > ```
 

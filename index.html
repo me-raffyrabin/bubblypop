@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Floating Bubbles</title>
+<style>
+  :root {
+    --bg-1: #04111f;
+    --bg-2: #082a45;
+    --bg-3: #0a3a52;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background:
+      radial-gradient(120% 90% at 20% 10%, var(--bg-3), transparent 60%),
+      radial-gradient(140% 100% at 80% 90%, #0b2c4d, transparent 55%),
+      linear-gradient(160deg, var(--bg-1), var(--bg-2));
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    cursor: default;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* subtle drifting caustic light, gives a watery ambience to the scene */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -20%;
+    background:
+      radial-gradient(40% 30% at 30% 40%, rgba(80,200,255,0.10), transparent 70%),
+      radial-gradient(35% 25% at 70% 60%, rgba(120,255,230,0.08), transparent 70%),
+      radial-gradient(30% 40% at 50% 80%, rgba(60,160,255,0.07), transparent 70%);
+    filter: blur(30px);
+    animation: caustics 22s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  @keyframes caustics {
+    0%   { transform: translate(0,0) scale(1); }
+    50%  { transform: translate(4%, -3%) scale(1.08); }
+    100% { transform: translate(-3%, 4%) scale(1.04); }
+  }
+
+  #stage { position: fixed; inset: 0; }
+
+  .hud {
+    position: fixed;
+    bottom: 18px; left: 0; right: 0;
+    text-align: center;
+    color: rgba(210,240,255,0.65);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    pointer-events: none;
+    z-index: 50;
+  }
+  .hud b { color: rgba(170,235,255,0.95); font-weight: 600; }
+  .hud .title {
+    font-size: clamp(22px, 5.5vw, 44px);
+    font-weight: 800;
+    letter-spacing: 0.16em;
+    color: rgba(190,235,255,0.92);
+    text-shadow: 0 2px 18px rgba(80,190,255,0.45);
+  }
+  .hud .timer {
+    margin-top: 8px;
+    font-size: clamp(26px, 7vw, 48px);
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: #ff3b3b;
+    text-shadow: 0 0 16px rgba(255,40,40,0.55);
+    font-variant-numeric: tabular-nums;
+  }
+  .hud .timer.low {
+    font-weight: 900;
+    animation: timerBlink 0.6s steps(1,end) infinite;
+  }
+  @keyframes timerBlink {
+    0%,100% { opacity: 1;   transform: scale(1.08); }
+    50%     { opacity: 0.2; transform: scale(1); }
+  }
+  .hud .reset {
+    pointer-events: auto;
+    margin-top: 8px;
+    display: inline-block;
+    padding: 6px 14px;
+    border: 1px solid rgba(150,220,255,0.3);
+    border-radius: 20px;
+    color: rgba(200,235,255,0.8);
+    cursor: pointer;
+    transition: all .2s ease;
+    backdrop-filter: blur(6px);
+  }
+  .hud .reset:hover { background: rgba(120,210,255,0.12); border-color: rgba(150,220,255,0.6); }
+
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    cursor: pointer;
+    will-change: transform;
+    transform: translate(-50%, -50%);
+    /* the floating wobble lives on an inner element so JS owns the outer transform */
+  }
+  .bubble .skin {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    overflow: hidden;
+    animation: wobble var(--wob, 6s) ease-in-out infinite;
+    transition: transform .12s ease;
+  }
+  .bubble:hover .skin { transform: scale(1.06); }
+
+  /* the glassy water body */
+  .bubble .skin::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 32% 28%, rgba(255,255,255,0.9), rgba(255,255,255,0.25) 12%, transparent 28%),
+      radial-gradient(circle at 70% 75%, rgba(120,225,255,0.5), transparent 45%),
+      radial-gradient(circle at 50% 50%, rgba(150,235,255,0.18), rgba(40,120,180,0.30) 70%, rgba(15,60,110,0.5) 100%);
+    box-shadow:
+      inset 0 0 18px rgba(255,255,255,0.25),
+      inset -6px -10px 24px rgba(10,40,80,0.55),
+      inset 6px 8px 22px rgba(180,245,255,0.35),
+      0 8px 30px rgba(0,30,60,0.45);
+    backdrop-filter: blur(1px);
+  }
+
+  /* internal swirling fluid layer, distorted by the SVG turbulence filter */
+  .bubble .fluid {
+    position: absolute;
+    inset: -20%;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 40% 35%, rgba(140,255,240,0.55), transparent 40%),
+      radial-gradient(circle at 65% 60%, rgba(90,170,255,0.55), transparent 42%),
+      radial-gradient(circle at 50% 80%, rgba(60,220,255,0.45), transparent 45%),
+      conic-gradient(from 0deg, rgba(120,240,255,0.3), rgba(70,150,255,0.3), rgba(150,255,235,0.3), rgba(120,240,255,0.3));
+    filter: url(#fluidWarp) blur(2px);
+    mix-blend-mode: screen;
+    opacity: 0.8;
+    animation: swirl var(--swirl, 9s) linear infinite;
+  }
+  @keyframes swirl {
+    from { transform: rotate(0deg) scale(1.05); }
+    to   { transform: rotate(360deg) scale(1.05); }
+  }
+
+  /* bright specular glint */
+  .bubble .glint {
+    position: absolute;
+    top: 16%; left: 22%;
+    width: 26%; height: 18%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95), transparent 70%);
+    filter: blur(0.5px);
+    transform: rotate(-20deg);
+  }
+  .bubble .glint.small {
+    top: 30%; left: 60%;
+    width: 9%; height: 7%;
+    opacity: 0.8;
+  }
+
+  @keyframes wobble {
+    0%,100% { transform: scale(1, 1); }
+    25%     { transform: scale(1.04, 0.96); }
+    50%     { transform: scale(0.97, 1.03); }
+    75%     { transform: scale(1.02, 0.98); }
+  }
+
+  /* ---- pop animation ---- */
+  .bubble.pop { pointer-events: none; }
+  .bubble.pop .skin {
+    animation: popBurst .45s cubic-bezier(.2,.7,.3,1) forwards;
+  }
+  @keyframes popBurst {
+    0%   { transform: scale(1);    opacity: 1; }
+    18%  { transform: scale(1.25); opacity: 1; }
+    100% { transform: scale(1.7);  opacity: 0; }
+  }
+
+  .ripple {
+    position: absolute;
+    left: 50%; top: 50%;
+    border-radius: 50%;
+    border: 2px solid rgba(180,245,255,0.7);
+    transform: translate(-50%,-50%) scale(0.3);
+    animation: ripple .55s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes ripple {
+    to { transform: translate(-50%,-50%) scale(2.2); opacity: 0; border-width: 0; }
+  }
+
+  .droplet {
+    position: absolute;
+    left: 50%; top: 50%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.95), rgba(120,225,255,0.7) 60%, rgba(60,150,220,0.5));
+    box-shadow: 0 0 6px rgba(150,235,255,0.6);
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  /* special bubbles hide a lattice sphere — a faint colored core hints its color */
+  .bubble.special .skin::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 50%,
+      transparent 35%, var(--gc, rgba(245,196,81,0.22)) 70%, transparent 85%);
+    mix-blend-mode: screen;
+    animation: goldPulse 3.2s ease-in-out infinite;
+  }
+  @keyframes goldPulse {
+    0%,100% { opacity: 0.35; transform: scale(0.94); }
+    50%     { opacity: 0.85; transform: scale(1.04); }
+  }
+
+  /* transparent overlay that hosts all pinned golden lattice spheres */
+  #fx {
+    position: fixed;
+    inset: 0;
+    z-index: 4;          /* above bubbles, below the HUD */
+    pointer-events: none;
+  }
+
+  /* ---- winning watery splash pouring down the screen ---- */
+  .splash {
+    position: fixed; inset: 0; z-index: 30; overflow: hidden; pointer-events: none;
+  }
+  .splash .sheet {
+    position: absolute; left: -5%; right: -5%; top: 0; height: 150%;
+    background: linear-gradient(180deg,
+      rgba(150,235,255,0.0) 0%, rgba(120,225,255,0.45) 22%,
+      rgba(70,190,245,0.7) 55%, rgba(40,150,225,0.82) 100%);
+    transform: translateY(-155%);
+    animation: pour 1.9s cubic-bezier(.45,0,.25,1) forwards;
+    filter: blur(0.4px);
+  }
+  /* scalloped wavy leading edge */
+  .splash .sheet::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -22px; height: 44px;
+    background: radial-gradient(circle at 22px -4px, rgba(90,200,245,0.8) 16px, transparent 17px) repeat-x;
+    background-size: 44px 44px;
+  }
+  @keyframes pour {
+    0%   { transform: translateY(-155%); }
+    72%  { transform: translateY(-8%); opacity: 1; }
+    100% { transform: translateY(2%); opacity: 0; }
+  }
+  .splash .drip {
+    position: absolute; top: -40px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.95), rgba(120,225,255,0.8) 60%, rgba(60,160,230,0.6));
+    box-shadow: 0 0 8px rgba(150,235,255,0.6);
+    animation: drop linear forwards;
+  }
+  @keyframes drop {
+    to { transform: translateY(115vh) scale(0.4); opacity: 0; }
+  }
+
+  /* ---- kid-friendly winner message ---- */
+  .winner {
+    position: fixed; inset: 0; z-index: 40; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 5vw; gap: 4vh;
+  }
+  .winner .again {
+    pointer-events: auto;
+    font-family: "Baloo 2", "Comic Sans MS", system-ui, sans-serif;
+    font-size: clamp(18px, 4.5vw, 30px);
+    font-weight: 800; letter-spacing: 0.06em;
+    color: #06304f; cursor: pointer;
+    padding: 0.5em 1.4em; border: none; border-radius: 999px;
+    background: linear-gradient(180deg, #fff1a8, #ffd24a 55%, #ffb43a);
+    box-shadow: 0 6px 0 #c98a14, 0 12px 26px rgba(0,0,0,0.35);
+    transform: scale(0); transition: transform .12s ease, box-shadow .12s ease;
+    animation: winPop 0.6s cubic-bezier(.2,1.5,.4,1) 0.5s forwards;
+  }
+  .winner .again:hover { box-shadow: 0 6px 0 #c98a14, 0 14px 30px rgba(0,0,0,0.45); }
+  .winner .again:active { transform: scale(0.94) translateY(3px); box-shadow: 0 3px 0 #c98a14, 0 8px 18px rgba(0,0,0,0.4); }
+  .winner h2 {
+    margin: 0; font-weight: 900; line-height: 1.05;
+    font-family: "Baloo 2", "Comic Sans MS", "Chalkboard SE", "Segoe UI Rounded",
+                 system-ui, -apple-system, sans-serif;
+    font-size: clamp(34px, 11vw, 120px);
+    letter-spacing: 0.01em;
+    filter: drop-shadow(0 6px 0 rgba(0,0,0,0.25)) drop-shadow(0 0 24px rgba(120,220,255,0.5));
+    transform: scale(0);
+    animation: winPop 0.7s cubic-bezier(.2,1.5,.4,1) 0.05s forwards;
+  }
+  @keyframes winPop { to { transform: scale(1); } }
+  .winner h2 .ltr {
+    display: inline-block;
+    background: linear-gradient(180deg, #fff7c7, #ffd24a 35%, #ff7eb6 65%, #7ad9ff);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: letterBounce 1.6s ease-in-out infinite;
+    animation-delay: var(--d, 0s);
+  }
+  .winner h2 .sp { display: inline-block; width: 0.35em; }
+  @keyframes letterBounce {
+    0%,100% { transform: translateY(0) rotate(0deg); }
+    30%     { transform: translateY(-0.16em) rotate(-4deg); }
+    60%     { transform: translateY(0.05em) rotate(3deg); }
+  }
+
+  /* ---- mobile / responsive ---- */
+  body { touch-action: manipulation; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  @media (max-width: 600px) {
+    .hud { bottom: 12px; font-size: 11px; padding: 0 12px; }
+    .hud .reset { margin-top: 6px; padding: 8px 16px; font-size: 12px; }
+  }
+  @media (hover: none) {
+    .bubble:hover .skin { transform: none; }   /* no sticky hover scale on touch */
+  }
+</style>
+</head>
+<body>
+
+<!-- hidden SVG: turbulence filter that gives the inner fluid its watery distortion -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="fluidWarp">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="7" result="noise">
+        <animate attributeName="baseFrequency" dur="14s"
+                 values="0.012 0.02; 0.02 0.012; 0.012 0.02" repeatCount="indefinite"/>
+      </feTurbulence>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="22"
+                         xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+</svg>
+
+<div id="stage"></div>
+<canvas id="fx"></canvas>
+<div class="hud">
+  <div class="title">POP THE BUBBLES</div>
+  <div class="timer" id="timer">1:00</div>
+  <div class="reset" id="reset">New Game</div>
+</div>
+
+<script>
+/* ============================================================
+   Audio — soft, layered, randomized pop sounds (Web Audio API)
+   No external files: every pop is synthesized so it always
+   sounds slightly different. Kept gentle by design.
+   ============================================================ */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let actx = null;
+let master = null;
+
+function initAudio() {
+  if (actx) return;
+  actx = new AudioCtx();
+  master = actx.createGain();
+  master.gain.value = 0.5;          // overall soft ceiling
+  master.connect(actx.destination);
+}
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[(Math.random() * arr.length) | 0];
+
+// noise buffer reused for the "burst" texture of each pop
+let noiseBuffer = null;
+function getNoise() {
+  if (noiseBuffer) return noiseBuffer;
+  const len = 0.4 * 44100;
+  noiseBuffer = actx.createBuffer(1, len, 44100);
+  const d = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  return noiseBuffer;
+}
+
+/* A pop = a quick pitched "bloop" (descending sine/triangle)
+   layered with a short filtered noise "burst". Pitch, timbre,
+   and timing are randomized so no two pops match. */
+function playPop(scale = 1) {
+  if (!actx) return;
+  if (actx.state === 'suspended') actx.resume();
+  const now = actx.currentTime;
+  const vol = rand(0.18, 0.32) * scale;     // soft — just enough to feel it
+
+  // ---- layer 1: pitched body (the "bloop") ----
+  const osc = actx.createOscillator();
+  const og = actx.createGain();
+  osc.type = pick(['sine', 'triangle', 'sine']);
+  const f0 = rand(420, 900);
+  osc.frequency.setValueAtTime(f0, now);
+  osc.frequency.exponentialRampToValueAtTime(f0 * rand(0.35, 0.55), now + 0.09);
+  og.gain.setValueAtTime(0.0001, now);
+  og.gain.exponentialRampToValueAtTime(vol, now + 0.006);
+  og.gain.exponentialRampToValueAtTime(0.0001, now + rand(0.10, 0.18));
+  osc.connect(og).connect(master);
+  osc.start(now);
+  osc.stop(now + 0.25);
+
+  // ---- layer 2: noise burst (the "tick"/wet snap) ----
+  const src = actx.createBufferSource();
+  src.buffer = getNoise();
+  const bp = actx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = rand(900, 2200);
+  bp.Q.value = rand(0.6, 1.4);
+  const ng = actx.createGain();
+  ng.gain.setValueAtTime(vol * 0.5, now);
+  ng.gain.exponentialRampToValueAtTime(0.0001, now + rand(0.04, 0.08));
+  src.connect(bp).connect(ng).connect(master);
+  src.start(now);
+  src.stop(now + 0.12);
+
+  // ---- layer 3: tiny high "droplet" shimmer (sometimes) ----
+  if (Math.random() < 0.6) {
+    const o2 = actx.createOscillator();
+    const g2 = actx.createGain();
+    o2.type = 'sine';
+    const f2 = rand(1400, 2600);
+    o2.frequency.setValueAtTime(f2, now + 0.02);
+    o2.frequency.exponentialRampToValueAtTime(f2 * 1.5, now + 0.10);
+    g2.gain.setValueAtTime(0.0001, now + 0.02);
+    g2.gain.exponentialRampToValueAtTime(vol * 0.25, now + 0.03);
+    g2.gain.exponentialRampToValueAtTime(0.0001, now + rand(0.12, 0.2));
+    o2.connect(g2).connect(master);
+    o2.start(now + 0.02);
+    o2.stop(now + 0.3);
+  }
+}
+
+/* ============================================================
+   Bubbles — floating physics + watery look + pop visuals
+   ============================================================ */
+const stage = document.getElementById('stage');
+const timerEl = document.getElementById('timer');
+const COUNT = 25;
+const SPHERES = 5;
+
+// 5 distinct sphere colors — each special bubble gets one (hint glow + 3D sphere).
+// Hue (0..1) is consumed by the Three.js module; the rgba is the in-bubble hint.
+const SPHERE_COLORS = [
+  { hue: 0.12, hint: 'rgba(245,196,81,0.30)' },   // gold
+  { hue: 0.52, hint: 'rgba(90,225,255,0.30)' },   // cyan
+  { hue: 0.90, hint: 'rgba(255,120,210,0.30)' },  // pink
+  { hue: 0.33, hint: 'rgba(130,240,150,0.30)' },  // green
+  { hue: 0.74, hint: 'rgba(180,150,255,0.30)' },  // violet
+];
+
+let bubbles = [];
+let remaining = COUNT;
+let spheresPopped = 0;
+let winning = false;
+let timeUp = false;
+const GAME_SECONDS = 60;
+let timeLeft = GAME_SECONDS;
+let timerId = null;
+
+const over = () => winning || timeUp;   // round has ended (won or out of time)
+
+function makeBubble() {
+  // scale bubble size to the viewport so it feels right on phones and desktops
+  const vmin = Math.min(innerWidth, innerHeight);
+  const sf = Math.max(0.55, Math.min(1.1, vmin / 760));
+  const size = rand(46, 116) * sf;
+  const el = document.createElement('div');
+  el.className = 'bubble';
+  el.style.width = size + 'px';
+  el.style.height = size + 'px';
+  el.style.setProperty('--wob', rand(4, 8).toFixed(2) + 's');
+  el.style.setProperty('--swirl', rand(7, 14).toFixed(2) + 's');
+
+  el.innerHTML = `
+    <div class="skin">
+      <div class="fluid"></div>
+    </div>
+    <div class="glint"></div>
+    <div class="glint small"></div>`;
+
+  const b = {
+    el,
+    size,
+    x: rand(size, innerWidth - size),
+    y: rand(size, innerHeight - size),
+    vx: rand(-0.35, 0.35),
+    vy: rand(-0.55, -0.15),   // gentle upward drift, like rising bubbles
+    drift: rand(0, Math.PI * 2),
+    driftSpeed: rand(0.006, 0.016),
+    driftAmp: rand(0.2, 0.6),
+    popped: false,
+  };
+
+  el.addEventListener('pointerdown', () => pop(b));
+  stage.appendChild(el);
+  return b;
+}
+
+function pop(b, mass = false) {
+  if (b.popped) return;
+  b.popped = true;
+  remaining--;
+
+  playPop(mass ? 0.4 : 1);
+
+  const { el, x, y, size } = b;
+
+  // special bubbles reveal a colored lattice sphere pinned at the pop point
+  if (b.hasSphere && window.spawnPinnedSphere) {
+    window.spawnPinnedSphere(x, y, size, b.colorId);
+    spheresPopped++;
+    if (spheresPopped >= SPHERES && !over()) {
+      setTimeout(winSequence, 280);          // all 5 found → celebrate
+    }
+  }
+
+  el.classList.add('pop');
+
+  // ripple ring
+  const ring = document.createElement('div');
+  ring.className = 'ripple';
+  ring.style.width = size + 'px';
+  ring.style.height = size + 'px';
+  el.appendChild(ring);
+
+  // splash droplets flung outward
+  const n = 7 + ((Math.random() * 6) | 0);
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'droplet';
+    const ds = rand(4, 10);
+    d.style.width = ds + 'px';
+    d.style.height = ds + 'px';
+    el.appendChild(d);
+    const ang = (i / n) * Math.PI * 2 + rand(-0.3, 0.3);
+    const dist = rand(size * 0.5, size * 1.1);
+    const dx = Math.cos(ang) * dist;
+    const dy = Math.sin(ang) * dist;
+    d.animate([
+      { transform: 'translate(-50%,-50%) translate(0,0) scale(1)', opacity: 1 },
+      { transform: `translate(-50%,-50%) translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0 }
+    ], { duration: rand(450, 700), easing: 'cubic-bezier(.2,.6,.3,1)', fill: 'forwards' });
+  }
+
+  setTimeout(() => el.remove(), 750);
+  bubbles = bubbles.filter(x => x !== b);
+}
+
+function tick() {
+  const leaving = [];
+  for (const b of bubbles) {
+    if (b.popped) continue;
+    b.drift += b.driftSpeed;
+    b.x += b.vx + Math.sin(b.drift) * b.driftAmp;
+    b.y += b.vy;
+
+    const r = b.size / 2;
+    if (b.y < -r) { leaving.push(b); continue; }   // floated off the top
+    if (b.x < r)            { b.x = r; b.vx = Math.abs(b.vx); }
+    if (b.x > innerWidth-r) { b.x = innerWidth - r; b.vx = -Math.abs(b.vx); }
+
+    b.el.style.transform = `translate(${b.x}px, ${b.y}px) translate(-50%,-50%)`;
+  }
+  for (const b of leaving) floatAway(b);
+  requestAnimationFrame(tick);
+}
+
+// a bubble drifted off-screen: it counts as one less. Preserve any unopened
+// sphere by moving its color onto another live bubble so the game stays winnable.
+function floatAway(b) {
+  if (b.popped) return;
+  b.popped = true;
+  b.el.remove();
+  bubbles = bubbles.filter(x => x !== b);
+  remaining--;
+  // a sphere bubble floated off: move its sphere to a random on-screen bubble
+  if (b.hasSphere && !over()) reassignSphere(b.colorId);
+}
+
+function reassignSphere(colorId) {
+  const cands = bubbles.filter(b => !b.popped && !b.hasSphere);
+  if (cands.length) assignSphere(cands[(Math.random() * cands.length) | 0], colorId);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {       // Fisher–Yates
+    const j = (Math.random() * (i + 1)) | 0;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function assignSphere(b, colorId) {
+  b.hasSphere = true;
+  b.colorId = colorId;
+  b.el.classList.add('special');
+  b.el.style.setProperty('--gc', SPHERE_COLORS[colorId].hint);
+}
+
+function build() {
+  stage.innerHTML = '';
+  bubbles = [];
+  remaining = COUNT;
+  spheresPopped = 0;
+  winning = false;
+  timeUp = false;
+  clearWinUI();
+  if (window.clearSpheres) window.clearSpheres();
+
+  for (let i = 0; i < COUNT; i++) bubbles.push(makeBubble());
+
+  // give 5 random bubbles a hidden sphere, each a different color (colorId 0..4)
+  const picks = shuffle([...Array(COUNT).keys()]).slice(0, SPHERES);
+  picks.forEach((bi, k) => assignSphere(bubbles[bi], k));
+
+  startTimer();
+}
+
+// every 10 seconds: add 20 fresh bubbles, hide any opened spheres, and
+// re-distribute all 5 spheres (hidden again) across every on-screen bubble.
+function topUp() {
+  if (over()) return;
+  for (let i = 0; i < 20; i++) { bubbles.push(makeBubble()); remaining++; }
+
+  // hide opened (pinned) spheres and reset progress
+  if (window.clearSpheres) window.clearSpheres();
+  spheresPopped = 0;
+  timerEl.classList.remove('low');
+
+  // clear every existing assignment, then redistribute 5 distinct colors
+  for (const b of bubbles) {
+    if (b.hasSphere) {
+      b.hasSphere = false; b.colorId = undefined;
+      b.el.classList.remove('special');
+      b.el.style.removeProperty('--gc');
+    }
+  }
+  const live = shuffle(bubbles.filter(b => !b.popped));
+  for (let k = 0; k < SPHERES && k < live.length; k++) assignSphere(live[k], k);
+}
+
+// ---- win sequence: pop everything, splash, message, orbiting spheres ----
+function popAll() {
+  bubbles.filter(b => !b.popped).forEach(b => {
+    setTimeout(() => pop(b, true), Math.random() * 380);   // near-simultaneous burst
+  });
+}
+
+function winSequence() {
+  if (over()) return;
+  winning = true;
+  stopTimer();
+  timerEl.classList.remove('low');
+  showSplash();
+  popAll();
+  setTimeout(() => {
+    showWinner();
+    if (window.startWinOrbit) window.startWinOrbit();
+  }, 950);
+}
+
+// ---- 60-second countdown ----
+function fmtTime(s) { return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+function startTimer() {
+  stopTimer();
+  timeLeft = GAME_SECONDS;
+  timerEl.textContent = fmtTime(timeLeft);
+  timerEl.classList.remove('low');
+  timerId = setInterval(() => {
+    timeLeft--;
+    timerEl.textContent = fmtTime(Math.max(0, timeLeft));
+    // every 10 seconds elapsed: add 20 bubbles + reshuffle all spheres
+    const elapsed = GAME_SECONDS - timeLeft;
+    if (timeLeft > 0 && elapsed % 10 === 0) topUp();
+    // last 10s with spheres unfound: bold + blinking
+    if (timeLeft <= 10 && spheresPopped < SPHERES) timerEl.classList.add('low');
+    if (timeLeft <= 0) { stopTimer(); timesUpSequence(); }
+  }, 1000);
+}
+function stopTimer() { if (timerId) { clearInterval(timerId); timerId = null; } }
+
+function timesUpSequence() {
+  if (over()) return;
+  timeUp = true;
+  timerEl.classList.remove('low');
+  showSplash();
+  popAll();
+  setTimeout(showTimesUp, 950);
+}
+
+function showSplash() {
+  const s = document.createElement('div');
+  s.className = 'splash';
+  s.id = 'splash';
+  s.innerHTML = '<div class="sheet"></div>';
+  // a shower of droplets racing down ahead of the sheet
+  for (let i = 0; i < 34; i++) {
+    const d = document.createElement('div');
+    d.className = 'drip';
+    const sz = rand(6, 16);
+    d.style.width = sz + 'px';
+    d.style.height = sz * rand(1, 1.6) + 'px';
+    d.style.left = rand(0, 100) + 'vw';
+    d.style.animationDuration = rand(0.9, 1.7) + 's';
+    d.style.animationDelay = rand(0, 0.5) + 's';
+    s.appendChild(d);
+  }
+  document.body.appendChild(s);
+  setTimeout(() => s.remove(), 2600);
+}
+
+function endScreen(text, withButton) {
+  const w = document.createElement('div');
+  w.className = 'winner';
+  w.id = 'winner';
+  const h = document.createElement('h2');
+  [...text].forEach((ch, i) => {
+    const span = document.createElement('span');
+    if (ch === ' ') { span.className = 'sp'; }
+    else {
+      span.className = 'ltr';
+      span.textContent = ch;
+      span.style.setProperty('--d', (i * 0.05).toFixed(2) + 's');
+    }
+    h.appendChild(span);
+  });
+  w.appendChild(h);
+  if (withButton) {
+    const btn = document.createElement('button');
+    btn.className = 'again';
+    btn.textContent = 'PLAY AGAIN';
+    btn.addEventListener('click', () => { initAudio(); build(); });
+    w.appendChild(btn);
+  }
+  document.body.appendChild(w);
+}
+function showWinner()  { endScreen('YOU ARE THE WINNER!', false); }
+function showTimesUp() { endScreen("TIME'S UP!", true); }
+
+function clearWinUI() {
+  document.getElementById('splash')?.remove();
+  document.getElementById('winner')?.remove();
+}
+
+// unlock audio on first interaction (browser autoplay policy)
+window.addEventListener('pointerdown', initAudio, { once: true });
+document.getElementById('reset').addEventListener('click', (e) => {
+  e.stopPropagation();
+  initAudio();
+  build();
+});
+
+build();
+tick();
+</script>
+
+<!-- ============================================================
+     Golden lattice spheres (reused from golden-lattice-sphere.html)
+     A single transparent Three.js overlay hosts up to 5 pinned
+     Fibonacci-sphere lattices, each placed where its bubble popped.
+     ============================================================ -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+const PHI = (1 + Math.sqrt(5)) / 2;          // golden ratio
+const GA  = Math.PI * (3 - Math.sqrt(5));    // golden angle ≈ 137.5°
+
+const fxCanvas = document.getElementById('fx');
+const renderer = new THREE.WebGLRenderer({ canvas: fxCanvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0);
+renderer.setSize(innerWidth, innerHeight);
+
+const scene = new THREE.Scene();
+
+// orthographic camera in *pixel* space so 3D spheres pin to 2D screen points:
+// world (x, y) maps 1:1 to (clientX, clientY), y growing downward.
+let camera;
+function setupCamera() {
+  camera = new THREE.OrthographicCamera(0, innerWidth, 0, innerHeight, -2000, 2000);
+  camera.position.z = 100;
+}
+setupCamera();
+
+const PR = Math.min(devicePixelRatio, 2);
+
+// ---- shared shader (gold lattice points) lifted from the original file ----
+const sphereMatProto = {
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexColors: true,
+  vertexShader: `
+    attribute float aSize;
+    varying vec3 vColor;
+    uniform float uPixelRatio;
+    void main() {
+      vColor = color;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * uPixelRatio;          // ortho: constant pixel size
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying vec3 vColor;
+    void main() {
+      vec2 uv = gl_PointCoord - 0.5;
+      float d = length(uv);
+      float a = smoothstep(0.5, 0.0, d);
+      a *= a;
+      gl_FragColor = vec4(vColor * (1.0 + a * 0.6), a);
+    }`
+};
+
+// hue per colorId (matches SPHERE_COLORS in the bubble script)
+const SPHERE_HUES = [0.12, 0.52, 0.90, 0.33, 0.74];
+
+// build one lattice sphere group, radius in pixels, tinted by hue
+function makeLatticeSphere(radius, n = 520, hue = 0.12) {
+  const base = new Float32Array(n * 3);
+  const sizes = new Float32Array(n);
+  const colors = new Float32Array(n * 3);
+
+  for (let i = 0; i < n; i++) {
+    const y = 1 - (i / (n - 1)) * 2;             // 1 .. -1
+    const r = Math.sqrt(1 - y * y);
+    const theta = GA * i;                         // golden-angle spiral
+    const x = Math.cos(theta) * r;
+    const z = Math.sin(theta) * r;
+    base[i*3]   = x * radius;
+    base[i*3+1] = y * radius;
+    base[i*3+2] = z * radius;
+    sizes[i] = (1.6 + 2.4 * Math.abs(Math.sin(theta * 0.5))) * (radius / 60);
+
+    // hue-tinted gradient, brighter toward the equator (same structure as original)
+    const c = new THREE.Color().setHSL(hue + 0.03 * Math.sin(theta), 0.85, 0.45 + 0.18 * (1 - Math.abs(y)));
+    colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+  }
+  const lineColor = new THREE.Color().setHSL(hue, 0.85, 0.6);
+  const coreColor = new THREE.Color().setHSL(hue, 0.9, 0.62);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(base.slice(), 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.ShaderMaterial({
+    ...sphereMatProto,
+    uniforms: { uPixelRatio: { value: PR } }
+  });
+  const points = new THREE.Points(geo, mat);
+
+  // connective golden lattice lines (each point to a golden-index neighbour)
+  const linePos = [];
+  for (let i = 0; i < n; i++) {
+    const j = (i + Math.round(PHI * Math.sqrt(i + 1))) % n;
+    linePos.push(base[i*3], base[i*3+1], base[i*3+2], base[j*3], base[j*3+1], base[j*3+2]);
+  }
+  const lgeo = new THREE.BufferGeometry();
+  lgeo.setAttribute('position', new THREE.Float32BufferAttribute(linePos, 3));
+  const lmat = new THREE.LineBasicMaterial({
+    color: lineColor, transparent: true, opacity: 0.10,
+    blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const lines = new THREE.LineSegments(lgeo, lmat);
+
+  // inner glow core
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(radius * 0.3, 24, 24),
+    new THREE.MeshBasicMaterial({ color: coreColor, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+
+  const inner = new THREE.Group();      // spins (tilted)
+  inner.add(points, lines, core);
+  inner.rotation.x = -0.4;
+
+  const group = new THREE.Group();      // positioned at the pop point, handles pop-in scale
+  group.add(inner);
+
+  return { group, inner, points, base, n, radius, birth: clock.getElapsedTime() };
+}
+
+const spheres = [];
+const clock = new THREE.Clock();
+
+// called by the bubble script when a special bubble pops
+let winMode = false;
+
+window.spawnPinnedSphere = function (x, y, bubbleSize, colorId = 0) {
+  const radius = Math.max(46, (bubbleSize || 90) * 0.7);
+  const hue = SPHERE_HUES[colorId % SPHERE_HUES.length];
+  const s = makeLatticeSphere(radius, 520, hue);
+  s.group.position.set(x, y, 0);
+  s.home = new THREE.Vector3(x, y, 0);    // where it was pinned
+  s.orbitIndex = spheres.length;          // 0..4, for equal spacing on win
+  scene.add(s.group);
+  spheres.push(s);
+};
+
+// all 5 found: spheres lift off and float, equally spaced, around screen center
+window.startWinOrbit = function () { winMode = true; };
+
+window.clearSpheres = function () {
+  winMode = false;
+  for (const s of spheres) {
+    scene.remove(s.group);
+    s.group.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
+  }
+  spheres.length = 0;
+};
+
+const easeOutBack = t => { const c = 1.7; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+
+function render() {
+  requestAnimationFrame(render);
+  const t = clock.getElapsedTime();
+
+  // win: equally-spaced orbit ring around screen center
+  const cx = innerWidth / 2, cy = innerHeight / 2;
+  const ringR = Math.min(innerWidth, innerHeight) * (innerWidth < 600 ? 0.34 : 0.3);
+
+  for (const s of spheres) {
+    const age = t - s.birth;
+
+    // pop-in: scale up with a slight overshoot, then a gentle breathing bob
+    const grow = age < 0.55 ? easeOutBack(Math.min(age / 0.55, 1)) : 1;
+    const bob = 1 + Math.sin(t * 2 + s.birth) * 0.025;
+    s.group.scale.setScalar(grow * bob * (winMode ? 1.15 : 1));
+
+    if (winMode) {
+      const ang = s.orbitIndex * (Math.PI * 2 / SPHERE_HUES.length) + t * 0.45;
+      const tx = cx + Math.cos(ang) * ringR;
+      const ty = cy + Math.sin(ang) * ringR;
+      s.group.position.x += (tx - s.group.position.x) * 0.05;
+      s.group.position.y += (ty - s.group.position.y) * 0.05;
+    }
+
+    // spin + a slow standing-wave breathing along surface normals
+    s.inner.rotation.y += winMode ? 0.02 : 0.012;
+    s.inner.rotation.z += 0.0015;
+    const pos = s.points.geometry.attributes.position.array;
+    for (let i = 0; i < s.n; i++) {
+      const bx = s.base[i*3], by = s.base[i*3+1], bz = s.base[i*3+2];
+      const phase = i * GA * 0.5 + (by / s.radius) * PHI;
+      const k = 1 + (Math.sin(t * 1.6 + phase) * 0.05);
+      pos[i*3] = bx * k; pos[i*3+1] = by * k; pos[i*3+2] = bz * k;
+    }
+    s.points.geometry.attributes.position.needsUpdate = true;
+  }
+
+  renderer.render(scene, camera);
+}
+render();
+
+addEventListener('resize', () => {
+  setupCamera();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

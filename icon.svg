@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="28%" r="90%">
+      <stop offset="0%" stop-color="#0c3a55"/>
+      <stop offset="55%" stop-color="#082a45"/>
+      <stop offset="100%" stop-color="#04111f"/>
+    </radialGradient>
+    <radialGradient id="bub" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="14%" stop-color="#bff0ff" stop-opacity="0.7"/>
+      <stop offset="55%" stop-color="#5cc6ff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#1f6ea8" stop-opacity="0.75"/>
+    </radialGradient>
+    <radialGradient id="bubSmall" cx="38%" cy="32%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="30%" stop-color="#aef0e6" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#3aa0d0" stop-opacity="0.7"/>
+    </radialGradient>
+  </defs>
+
+  <!-- full-bleed background so the icon also works "maskable" -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- small accent bubbles -->
+  <circle cx="370" cy="150" r="46" fill="url(#bubSmall)"/>
+  <circle cx="356" cy="138" r="13" fill="#ffffff" fill-opacity="0.85"/>
+
+  <circle cx="150" cy="370" r="34" fill="url(#bubSmall)"/>
+  <circle cx="139" cy="361" r="10" fill="#ffffff" fill-opacity="0.85"/>
+
+  <!-- main hero bubble -->
+  <circle cx="240" cy="270" r="135" fill="url(#bub)"/>
+  <circle cx="240" cy="270" r="135" fill="none" stroke="#dffaff" stroke-opacity="0.35" stroke-width="3"/>
+  <!-- specular highlights -->
+  <ellipse cx="196" cy="216" rx="42" ry="30" fill="#ffffff" fill-opacity="0.9" transform="rotate(-20 196 216)"/>
+  <circle cx="290" cy="232" r="12" fill="#ffffff" fill-opacity="0.7"/>
+</svg>

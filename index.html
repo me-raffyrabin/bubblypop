@@ -131,30 +131,47 @@
       inset -6px -10px 24px rgba(10,40,80,0.55),
       inset 6px 8px 22px rgba(180,245,255,0.35),
       0 8px 30px rgba(0,30,60,0.45);
-    backdrop-filter: blur(1px);
+    /* (backdrop-filter removed — very expensive on iOS with many bubbles) */
   }
 
-  /* internal swirling fluid layer, distorted by the SVG turbulence filter */
+  /* internal swirling fluid layer — pure CSS gradients + transforms (GPU-cheap).
+     The animated SVG turbulence filter was removed: it was the cause of the
+     severe slowdown on iOS Safari (per-pixel noise recomputed every frame
+     across dozens of bubbles). */
   .bubble .fluid {
     position: absolute;
-    inset: -20%;
+    inset: -10%;
     border-radius: 50%;
     background:
       radial-gradient(circle at 40% 35%, rgba(140,255,240,0.55), transparent 40%),
       radial-gradient(circle at 65% 60%, rgba(90,170,255,0.55), transparent 42%),
       radial-gradient(circle at 50% 80%, rgba(60,220,255,0.45), transparent 45%),
       conic-gradient(from 0deg, rgba(120,240,255,0.3), rgba(70,150,255,0.3), rgba(150,255,235,0.3), rgba(120,240,255,0.3));
-    filter: url(#fluidWarp) blur(2px);
-    /* clip-path runs after filter, so it crops the filter's square output to a circle */
     clip-path: circle(50%);
     -webkit-clip-path: circle(50%);
     mix-blend-mode: screen;
     opacity: 0.8;
     animation: swirl var(--swirl, 9s) linear infinite;
   }
+  /* a second counter-rotating gradient layer fakes the fluid churn cheaply */
+  .bubble .fluid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 60% 30%, rgba(170,255,235,0.5), transparent 45%),
+      radial-gradient(circle at 35% 70%, rgba(80,180,255,0.5), transparent 48%);
+    animation: swirl2 var(--swirl, 9s) linear infinite reverse;
+  }
   @keyframes swirl {
-    from { transform: rotate(0deg) scale(1.05); }
-    to   { transform: rotate(360deg) scale(1.05); }
+    from { transform: rotate(0deg) scale(1.06); }
+    to   { transform: rotate(360deg) scale(1.06); }
+  }
+  @keyframes swirl2 {
+    0%   { transform: rotate(0deg) scale(1); }
+    50%  { transform: rotate(180deg) scale(1.12); }
+    100% { transform: rotate(360deg) scale(1); }
   }
 
   /* bright specular glint */
@@ -329,20 +346,6 @@
 </style>
 </head>
 <body>
-
-<!-- hidden SVG: turbulence filter that gives the inner fluid its watery distortion -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <filter id="fluidWarp">
-      <feTurbulence type="fractalNoise" baseFrequency="0.012 0.02" numOctaves="2" seed="7" result="noise">
-        <animate attributeName="baseFrequency" dur="14s"
-                 values="0.012 0.02; 0.02 0.012; 0.012 0.02" repeatCount="indefinite"/>
-      </feTurbulence>
-      <feDisplacementMap in="SourceGraphic" in2="noise" scale="22"
-                         xChannelSelector="R" yChannelSelector="G"/>
-    </filter>
-  </defs>
-</svg>
 
 <div id="stage"></div>
 <canvas id="fx"></canvas>
